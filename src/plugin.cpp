@@ -1,4 +1,5 @@
 #include "plugin.h"
+#include "config.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -65,7 +66,7 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
     freopen_s(&f, "CONIN$", "r", stdin);
     freopen_s(&f, "CONOUT$", "w", stdout);
     freopen_s(&f, "CONOUT$", "w", stderr);
-    ifstream inFile("C:\\Users\\ggmaple555\\Desktop\\AIS3\\vmp.txt", std::ios::in);
+    ifstream inFile(VMPPATH, std::ios::in);
     if (!inFile) {
         printf("Failed to open the Ladder file.\n");
         return 0;

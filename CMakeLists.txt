@@ -50,6 +50,7 @@ include("cmake/x64dbg.cmake")
 set(PluginTemplate_SOURCES
 	"src/plugin.cpp"
 	"src/pluginmain.cpp"
+	"src/config.h"
 	"src/plugin.h"
 	"src/pluginmain.h"
 	cmake.toml
