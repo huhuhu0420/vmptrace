@@ -1,4 +1,11 @@
 #include "plugin.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <map>
+
+using namespace std;
+FILE* f;
 
 // Examples: https://github.com/x64dbg/x64dbg/wiki/Plugins
 // References:
@@ -7,58 +14,85 @@
 // - https://x64dbg.com/blog/2016/10/20/threading-model.html
 // - https://x64dbg.com/blog/2016/07/30/x64dbg-plugin-sdk.html
 
-// Command use the same signature as main in C
-// argv[0] contains the full command, after that are the arguments
-// NOTE: arguments are separated by a COMMA (not space like WinDbg)
-static bool cbExampleCommand(int argc, char** argv)
-{
-    if (argc < 3)
-    {
-        dputs("Usage: " PLUGIN_NAME "expr1, expr2");
+struct vmp_instr {
+    uintptr_t vip;
+    string* name;
+    string* etc;
+};
 
-        // Return false to indicate failure (used for scripting)
-        return false;
+const std::vector<std::string> split(const std::string& str, const char& delimiter) {
+    std::vector<std::string> result;
+    std::stringstream ss(str);
+    std::string tok;
+
+    while (std::getline(ss, tok, delimiter)) {
+        result.push_back(tok);
     }
+    return result;
+}
 
-    // Helper function for parsing expressions
-    // Reference: https://help.x64dbg.com/en/latest/introduction/Expressions.html
-    auto parseExpr = [](const char* expression, duint& value)
-    {
-        bool success = false;
-        value = DbgEval(expression, &success);
-        if (!success)
-            dprintf("Invalid expression '%s'\n", expression);
-        return success;
-    };
+static void cbVmpEntry() {
+    //DbgCmdExec("sto");
+    uintptr_t aa = Script::Register::GetCIP();
+    cout << aa;
+    
+}
 
-    duint a = 0;
-    if (!parseExpr(argv[1], a))
-        return false;
+static bool cbVmpTrace(int argc, char** argv) {
 
-    duint b = 0;
-    if (!parseExpr(argv[2], b))
-        return false;
+    uintptr_t base_addr = DbgEval("mod.main()");
 
-    // NOTE: Look at x64dbg-sdk/pluginsdk/bridgemain.h for a list of available functions.
-    // The Script:: namespace and DbgFunctions()->... are also good to check out.
-
-    // Do something meaningful with the arguments
-    duint result = a + b;
-    dprintf("$result = 0x%p + 0x%p = 0x%p\n", a, b, result);
-
-    // The $result variable can be used for scripts
-    DbgValToString("$result", result);
-
+    SetBPX(base_addr + 0xbc20, UE_SINGLESHOOT, cbVmpEntry);
+   
     return true;
 }
+
+PLUG_EXPORT void CBSYSTEMBREAKPOINT(CBTYPE cbType, PLUG_CB_SYSTEMBREAKPOINT* info)
+{
+ 
+    cbVmpTrace(0, NULL);
+}
+
 
 // Initialize your plugin data here.
 bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
+   
+    _plugin_registercommand(pluginHandle, "VmpTrace", cbVmpTrace, true);
+   
+    AllocConsole();
+    
+    freopen_s(&f, "CONIN$", "r", stdin);
+    freopen_s(&f, "CONOUT$", "w", stdout);
+    freopen_s(&f, "CONOUT$", "w", stderr);
+    ifstream inFile("C:\\Users\\ggmaple555\\Desktop\\AIS3\\vmp.txt", std::ios::in);
+    if (!inFile) {
+        printf("Failed to open the Ladder file.\n");
+        return 0;
+    }
+    string s;
+    vector< vmp_instr*> ins;
+    map<uintptr_t, vmp_instr*> instr_map;
+    while (getline(inFile, s)) {
+        vector<string> sp = split(s, ';');
+        vmp_instr* item = (vmp_instr*)malloc(sizeof(vmp_instr));
+        stringstream ss;
+        ss << std::hex << sp[0];
+        ss >> item->vip;
+        item->name = new string(sp[1]);
+        ins.push_back(item);
+        instr_map.insert(pair<uintptr_t, vmp_instr*>(item->vip, item));
+        cout << s << endl;
+    }
+    //cout << *instr_map[0x14000baba]->name;
     dprintf("pluginInit(pluginHandle: %d)\n", pluginHandle);
 
+    // Use a while loop together with the getline() function to read the file line by line
+
+
+
     // Prefix of the functions to call here: _plugin_register
-    _plugin_registercommand(pluginHandle, PLUGIN_NAME, cbExampleCommand, true);
+    
 
     // Return false to cancel loading the plugin.
     return true;
@@ -71,6 +105,12 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
 void pluginStop()
 {
     // Prefix of the functions to call here: _plugin_unregister
+
+    fclose(stdin);
+    fclose(stdout);
+    fclose(stderr);
+    FreeConsole();
+    fclose(f);
 
     dprintf("pluginStop(pluginHandle: %d)\n", pluginHandle);
 }
