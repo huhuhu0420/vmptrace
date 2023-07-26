@@ -2,4 +2,4 @@
 
 #include <string>
 
-std::string VMPPATH = "C:\\Users\\ghost\\code\\vmptrace\\test1.vmp2";
+std::string VMPPATH = "C:\\Users\\ghost\\code\\vmptrace\\vmp.txt";
