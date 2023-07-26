@@ -33,13 +33,16 @@ const std::vector<std::string> split(const std::string& str, const char& delimit
 }
 
 static void cbVmpEntry() {
-    //DbgCmdExec("sto");
+    DbgCmdExecDirect("sti");
     uintptr_t aa = Script::Register::GetCIP();
-    cout << aa;
+    cout << hex << aa << endl;;
+    DbgCmdExecDirect("sti");
+    aa = Script::Register::GetCIP();
+    cout << hex<< aa;
     
 }
 
-static bool cbVmpTrace(int argc, char** argv) {
+static bool cbVmprofiler(int argc, char** argv) {
 
     uintptr_t base_addr = DbgEval("mod.main()");
 
@@ -51,15 +54,17 @@ static bool cbVmpTrace(int argc, char** argv) {
 PLUG_EXPORT void CBSYSTEMBREAKPOINT(CBTYPE cbType, PLUG_CB_SYSTEMBREAKPOINT* info)
 {
  
-    cbVmpTrace(0, NULL);
+    cbVmprofiler(0, NULL);
 }
+
+
 
 
 // Initialize your plugin data here.
 bool pluginInit(PLUG_INITSTRUCT* initStruct)
 {
    
-    _plugin_registercommand(pluginHandle, "VmpTrace", cbVmpTrace, true);
+    _plugin_registercommand(pluginHandle, "vmprofiler", cbVmprofiler, true);
    
     AllocConsole();
     
@@ -89,8 +94,6 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct)
     dprintf("pluginInit(pluginHandle: %d)\n", pluginHandle);
 
     // Use a while loop together with the getline() function to read the file line by line
-
-
 
     // Prefix of the functions to call here: _plugin_register
     
