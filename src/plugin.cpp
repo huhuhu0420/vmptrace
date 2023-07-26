@@ -51,6 +51,12 @@ static bool cbVmprofiler(int argc, char** argv) {
     return true;
 }
 
+/*callback each step*/
+PLUG_EXPORT void CBSTEPPED(CBTYPE, PLUG_CB_STEPPED* info)
+{
+	
+}
+
 PLUG_EXPORT void CBSYSTEMBREAKPOINT(CBTYPE cbType, PLUG_CB_SYSTEMBREAKPOINT* info)
 {
  
