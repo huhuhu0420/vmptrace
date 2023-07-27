@@ -4,22 +4,21 @@
 #include <fstream>
 #include <sstream>
 #include <map>
+#include <Windows.h>
+#include <string>
 
 using namespace std;
 FILE* f;
-
-// Examples: https://github.com/x64dbg/x64dbg/wiki/Plugins
-// References:
-// - https://help.x64dbg.com/en/latest/developers/plugins/index.html
-// - https://x64dbg.com/blog/2016/10/04/architecture-of-x64dbg.html
-// - https://x64dbg.com/blog/2016/10/20/threading-model.html
-// - https://x64dbg.com/blog/2016/07/30/x64dbg-plugin-sdk.html
-
-struct vmp_instr {
+bool beingHittedVMEntry;
+uintptr_t base_addr;
+HANDLE hThread;
+struct vmp_ins {
     uintptr_t vip;
     string* name;
     string* etc;
 };
+
+map<uintptr_t, vmp_ins*> ins_map;
 
 const std::vector<std::string> split(const std::string& str, const char& delimiter) {
     std::vector<std::string> result;
@@ -32,105 +31,119 @@ const std::vector<std::string> split(const std::string& str, const char& delimit
     return result;
 }
 
+static vmp_ins* getVMPIns() {
+    uintptr_t ip = Script::Register::GetCIP();
+    DISASM_INSTR instr;
+    DbgDisasmAt(ip,  &instr);
+
+    if (instr.type == instr_branch && strlen(instr.instruction) == 7 ) {
+        uintptr_t vip_rva = Script::Register::GetCSI() - base_addr;
+        vmp_ins* ins = ins_map[vip_rva];
+        if (ins) {
+            cout << hex << Script::Register::GetCSI()  << " " << *ins->name << " ";
+            cout << endl;
+            return ins;
+        }
+    }
+
+    return NULL;
+}
+
 static void cbVmpEntry() {
-    DbgCmdExecDirect("sti");
-    uintptr_t aa = Script::Register::GetCIP();
-    cout << hex << aa << endl;;
-    DbgCmdExecDirect("sti");
-    aa = Script::Register::GetCIP();
-    cout << hex<< aa;
-    
+    beingHittedVMEntry = true;
+    uintptr_t ip = Script::Register::GetCIP();
+    DISASM_INSTR instr;
+    DbgDisasmAt(ip, &instr);
+    Script::Debug::SetBreakpoint(ip + instr.instr_size);
+}
+
+
+
+void WINAPI CMDThread() {
+    static char cmd1[] = "ticnd 0";
+    string inputString;
+    while (getline(cin, inputString)) {
+        if (!beingHittedVMEntry)
+            continue;
+        if (inputString == "vmpsti") 
+            DbgCmdExec(cmd1);
+    }
 }
 
 static bool cbVmprofiler(int argc, char** argv) {
-
-    uintptr_t base_addr = DbgEval("mod.main()");
-
-    SetBPX(base_addr + 0xbc20, UE_SINGLESHOOT, cbVmpEntry);
-   
+    base_addr = DbgEval("mod.main()");
+    SetBPX(base_addr + 0xbc20, UE_BREAKPOINT, cbVmpEntry);
+    hThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)CMDThread, NULL, 0, NULL);
     return true;
 }
 
-/*callback each step*/
-PLUG_EXPORT void CBSTEPPED(CBTYPE, PLUG_CB_STEPPED* info)
-{
-	
-}
-
-PLUG_EXPORT void CBSYSTEMBREAKPOINT(CBTYPE cbType, PLUG_CB_SYSTEMBREAKPOINT* info)
-{
- 
+PLUG_EXPORT void CBSYSTEMBREAKPOINT(CBTYPE cbType, PLUG_CB_SYSTEMBREAKPOINT* info){
     cbVmprofiler(0, NULL);
 }
 
+PLUG_EXPORT void CBSTEPPED(CBTYPE, PLUG_CB_STEPPED* info) {
+    if (!beingHittedVMEntry)
+        return;
+    getVMPIns();
+}
+
+PLUG_EXPORT void CBTRACEEXECUTE(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info){
+    if (!beingHittedVMEntry)
+        return;
+    if (getVMPIns())
+        info->stop = true;
+}
+
+PLUG_EXPORT void CBEXITPROCESS(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info){
+    TerminateThread(hThread, 0);
+}
 
 
-
-// Initialize your plugin data here.
-bool pluginInit(PLUG_INITSTRUCT* initStruct)
-{
-   
-    _plugin_registercommand(pluginHandle, "vmprofiler", cbVmprofiler, true);
-   
+bool pluginInit(PLUG_INITSTRUCT* initStruct){
     AllocConsole();
-    
     freopen_s(&f, "CONIN$", "r", stdin);
     freopen_s(&f, "CONOUT$", "w", stdout);
     freopen_s(&f, "CONOUT$", "w", stderr);
-    ifstream inFile(VMPPATH, std::ios::in);
+
+    ifstream inFile("C:\\Users\\ggmaple555\\Desktop\\AIS3\\vmp.txt", std::ios::in);
     if (!inFile) {
         printf("Failed to open the Ladder file.\n");
         return 0;
     }
     string s;
-    vector< vmp_instr*> ins;
-    map<uintptr_t, vmp_instr*> instr_map;
+    //vector< vmp_ins*> ins;
+   
     while (getline(inFile, s)) {
         vector<string> sp = split(s, ';');
-        vmp_instr* item = (vmp_instr*)malloc(sizeof(vmp_instr));
-        stringstream ss;
+        vmp_ins* item = (vmp_ins*)malloc(sizeof(vmp_ins));
+        stringstream ss; uintptr_t rva;
         ss << std::hex << sp[0];
-        ss >> item->vip;
+        ss >> rva;
         item->name = new string(sp[1]);
-        ins.push_back(item);
-        instr_map.insert(pair<uintptr_t, vmp_instr*>(item->vip, item));
-        cout << s << endl;
+        //.push_back(item);
+        ins_map.insert(pair<uintptr_t, vmp_ins*>(rva, item));
     }
     //cout << *instr_map[0x14000baba]->name;
+
     dprintf("pluginInit(pluginHandle: %d)\n", pluginHandle);
 
-    // Use a while loop together with the getline() function to read the file line by line
-
-    // Prefix of the functions to call here: _plugin_register
-    
-
-    // Return false to cancel loading the plugin.
+    _plugin_registercommand(pluginHandle, "vmprofiler", cbVmprofiler, true);
+    beingHittedVMEntry = false;
     return true;
 }
 
-// Deinitialize your plugin data here.
-// NOTE: you are responsible for gracefully closing your GUI
-// This function is not executed on the GUI thread, so you might need
-// to use WaitForSingleObject or similar to wait for everything to close.
-void pluginStop()
-{
-    // Prefix of the functions to call here: _plugin_unregister
 
+void pluginStop(){
     fclose(stdin);
     fclose(stdout);
     fclose(stderr);
     FreeConsole();
     fclose(f);
-
+    
     dprintf("pluginStop(pluginHandle: %d)\n", pluginHandle);
+    _plugin_unregistercommand(pluginHandle, "vmprofiler");
 }
 
-// Do GUI/Menu related things here.
-// This code runs on the GUI thread: GetCurrentThreadId() == GuiGetMainThreadId()
-// You can get the HWND using GuiGetWindowHandle()
-void pluginSetup()
-{
-    // Prefix of the functions to call here: _plugin_menu
-
+void pluginSetup(){
     dprintf("pluginSetup(pluginHandle: %d)\n", pluginHandle);
 }
