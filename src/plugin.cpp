@@ -192,12 +192,18 @@ PLUG_EXPORT void CBEXITPROCESS(CBTYPE cbType, PLUG_CB_TRACEEXECUTE* info){
     TerminateThread(hThread, 0);
 }
 
-
-bool pluginInit(PLUG_INITSTRUCT* initStruct){
+PLUG_EXPORT void CBMENUENTRY(CBTYPE cbType, PLUG_CB_MENUENTRY* info) {
     AllocConsole();
     freopen_s(&f, "CONIN$", "r", stdin);
     freopen_s(&f, "CONOUT$", "w", stdout);
     freopen_s(&f, "CONOUT$", "w", stderr);
+}
+
+bool pluginInit(PLUG_INITSTRUCT* initStruct){
+     //AllocConsole();
+     //freopen_s(&f, "conin$", "r", stdin);
+     //freopen_s(&f, "conout$", "w", stdout);
+     //freopen_s(&f, "conout$", "w", stderr);
 
     ifstream inFile(FILEPATH, std::ios::in);
     if (!inFile) {
@@ -239,4 +245,5 @@ void pluginStop(){
 
 void pluginSetup(){
     dprintf("pluginSetup(pluginHandle: %d)\n", pluginHandle);
+    _plugin_menuaddentry(hMenu, 0, "VmpTrace");
 }
