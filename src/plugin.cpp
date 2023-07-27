@@ -199,7 +199,7 @@ bool pluginInit(PLUG_INITSTRUCT* initStruct){
     freopen_s(&f, "CONOUT$", "w", stdout);
     freopen_s(&f, "CONOUT$", "w", stderr);
 
-    ifstream inFile("C:\\Users\\ggmaple555\\Desktop\\AIS3\\vmp.txt", std::ios::in);
+    ifstream inFile(FILEPATH, std::ios::in);
     if (!inFile) {
         printf("Failed to open the Ladder file.\n");
         return 0;
